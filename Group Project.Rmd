@@ -1,0 +1,171 @@
+---
+title: "STAT443 Group Project"
+author: "Colton Cheung, Darren Ku, Yoonha Kim"
+date: "31/03/2020"
+output:
+  html_document: default
+  pdf_document: default
+fig_width: 5
+fig_height: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(forecast)
+```
+
+## Introduction
+As we entered late Janurary to early Feburary, the concern surrounding the novel Coronavirus dubbed Covid-19 soon grew beyond the limited geographic scope of its origins and entered the minds of the world. It was these growing global concerns that motivated our study of the closing price of the NASDAQ stock exchange and how the world's second largest stock exchange would react in the face of a potential pandemic. Under the premise that China serves as a major economic power and important step in global supply chains, our hypothesis would be that many of the companies listed on the NASDAQ stack exchange would have their businesses impacted negatively by the spread of Covid-19, and thus consequently we would see that reflected in the overall closing price of NASDAQ.
+  
+Eventually Covid-19 would be dubbed a pandemic and we would see NASDAQ react as we expected.
+
+We collected our Data by looking at the summary of the Open, High, Low, Close, Adjusted Close, and Volume on Google Finance after the end of the trading day, which ends at 4:00pm EST each business day. Our data starts from January 17th to March 20th. For comparison's sake, we also took a look at the NASDAQ closing prices for the 46 day period between October 17th and December 20th as well as the 44 day period between January 17th to March 20th of the past year. The historical data was obtained via Google Finance's historical data archives.
+
+Our main variable of interest is the adjusted closing price with Open, High, Low and Volume as supplementary variables.
+
+
+```{r data}
+OctToDec<-read.table("NASDAQ_OCT17_DEC20.csv", header=TRUE, sep=",")
+JanToMar<-read.table("NASDAQ_JAN17_MAR20.csv", header=TRUE, sep=",")
+JanToMar2019<-read.table("NASDAQ_JAN17_MAR20_2019.csv", header=TRUE, sep=",")
+```
+                  
+## Original Time Series Plots
+
+
+```{r plots, echo=FALSE}
+plot.ts(JanToMar$Adj.Close, main="NASDAQ Adjusted closing price from Jan. 17 to Mar. 20 2020",ylab = "Closing price")
+acf(JanToMar$Adj.Close, main="NASDAQ Adjusted closing price from Jan. 17 to Mar. 20 2020")
+pacf(JanToMar$Adj.Close, main="NASDAQ Adjusted closing price from Jan. 17 to Mar. 20 2020")
+
+plot.ts(JanToMar2019$Adj.Close, main="NASDAQ Adjusted closing price from Jan. 17 to Mar. 20 2019",ylab = "Closing price")
+acf(JanToMar2019$Adj.Close, main="NASDAQ Adjusted closing price from Jan. 17 to Mar. 20 2019")
+pacf(JanToMar2019$Adj.Close, main="NASDAQ Adjusted closing price from Jan. 17 to Mar 20 2019")
+
+plot.ts(OctToDec$Adj.Close, main="NASDAQ Adjusted closing price from Oct. 17 to Dec. 20 2019",ylab = "Closing price")
+acf(OctToDec$Adj.Close, main="NASDAQ Adjusted closing price from Oct. 17 to Dec. 20 2019")
+pacf(OctToDec$Adj.Close, main="NASDAQ Adjusted closing price from Oct. 17 to Dec. 20 2019")
+```
+
+### Preliminary Plots Analysis
+  As evident from the plots of the 3 time series, our January to March 2020 data has an overall negative trend, while both our 2019 datasets have positive trends. In fact look at the historical data for NASDAQ, it had a positive change of 35.23% over all of 2019, the highest yearly increase since 2013.
+  
+  Meanwhile, the ACFs of all three datasets are all very similar, each simply decaying with increasing lag. Looking to the PACF, we see that there are no significant PACF values outside of lag 1. This inidicates that potentially an AR(1) model may be the appropriate thing to fit to this data.
+
+## First Differences Plots
+```{r diffplots, echo=FALSE}
+JanMarDiff <- diff(JanToMar$Adj.Close)
+JanMar2019Diff <- diff(JanToMar2019$Adj.Close)
+OctDecDiff <- diff(OctToDec$Adj.Close)
+
+plot.ts(JanMarDiff, main="NASDAQ Adjusted closing price Daily Change Jan.17-Mar.20 2020",ylab = "Adjusted Closing price change")
+acf(JanMarDiff, main="NASDAQ Adjusted closing price Daily Change Jan.17-Mar.20 2020")
+pacf(JanMarDiff, main="NASDAQ Adjusted closing price Daily Change Jan.17-Mar.20 2020")
+
+plot.ts(JanMar2019Diff, main="NASDAQ Adjusted closing price Daily Change Jan.17-Mar.20 2019",ylab = "Adjusted Closing price change")
+acf(JanMar2019Diff, main="NASDAQ Adjusted closing price Daily Change Jan.17-Mar.20 2019")
+pacf(JanMar2019Diff, main="NASDAQ Adjusted closing price Daily Change Jan.17-Mar.20 2019")
+
+plot.ts(OctDecDiff, main="NASDAQ Adjusted closing price Daily Change Oct. 17-Dec. 20 2019",ylab = "Adjusted Closing price Change")
+acf(OctDecDiff, main="NASDAQ Adjusted closing price Daily Change Oct. 17-Dec. 20 2019")
+pacf(OctDecDiff, main="NASDAQ Adjusted closing price Daily Change Oct. 17-Dec. 20 2019")
+``` 
+
+### First Differences Anaylsis
+  Applying first differences to the 3 time series, we see a departure of the January to March 2020 series from the other two. While the 2019 time series exhibit similar fluctuation behaviour, the 2020 time series shows a persisting increase in fluctuation magnitude starting from late February / early March 2020.
+    
+  These sudden changes in the 2020 time series are expected in light of increasing reports of COVID-19 related cases and deaths. It was during early March (the 11th) that the World Health Organization declared COVID-19 a pandemic. Social distancing was more frequently practiced and businesses categorized as "non-essential" had to cease operations during this period as well.
+  
+  Meanwhile, the ACFs tails off after lag 1. Looking to the PACF, we see that the PACF of the data from Jan.17-Mar.20 2020 cuts off at lag 1. The PACF of 2019 Jan-Mar data cuts off at lag 2 and the PACF of 2019 Oct-Dec data cuts off at lag 3.This inidicates that potentially AR(1), AR(2), AR(3) models may be the appropriate thing to fit to this data respectively.
+  
+
+## Manually-Fitted Model
+```{r manulmodels, echo=FALSE}
+#2020
+fitJanMarDiff <- arima(JanMarDiff,order=c(1,0,0))
+alpha1_JanMarDiff <- fitJanMarDiff$coef[1]
+sd_fitJanMarDiff <- sqrt(fitJanMarDiff$sigma2)
+#2019JANMAR
+fitJanMar2019Diff <- arima(JanMar2019Diff,order=c(2,0,0))
+alpha1_JanMar2019Diff <- fitJanMar2019Diff$coef[1]
+alpha2_JanMar2019Diff <- fitJanMar2019Diff$coef[2]
+sd_fitJanMar2019Diff <- sqrt(fitJanMar2019Diff$sigma2)
+#2019OCTDEC
+fitOctDecDiff <- arima(OctDecDiff,order=c(3,0,0))
+alpha1_fitOctDecDiff <- fitOctDecDiff$coef[1]
+alpha2_fitOctDecDiff <- fitOctDecDiff$coef[2]
+alpha3_fitOctDecDiff <- fitOctDecDiff$coef[3]
+sd_fitOctDecDiff <- sqrt(fitOctDecDiff$sigma2)
+fitJanMarDiff
+tsdiag(fitJanMarDiff)
+fitJanMar2019Diff
+tsdiag(fitJanMar2019Diff)
+fitOctDecDiff
+tsdiag(fitOctDecDiff)
+```
+
+###  Model diagnostics of Manually-fitted Model 
+  Fitting AR(1), AR(2), AR(3) models to 2020 January-March, 2019 January-March, 2019 October-December data is reasonable. The model diagonisics of all three fitted models via tsdiag command tells that the Residual plots are random, independent and the p-values for Ljung-Box is higher than 0.05. Thus, we do not reject our null-hypothesis which is the model fits well. We can also simulate AR(1), AR(2), AR(3) models and see its behaviours.
+
+```{r manualmodelplots, echo=FALSE}
+JanMarDiffSim <- arima.sim(n=length(JanMarDiff), list(ar=c(alpha1_JanMarDiff)), sd = sd_fitJanMarDiff)
+plot(JanMarDiffSim, main="Simulated NASDAQ Adjusted closing price Daily Change Jan.17-Mar.20 2020")
+acf(JanMarDiffSim, main="Simulated NASDAQ Adjusted closing price Jan.17-Mar.20 2020")
+pacf(JanMarDiffSim, main="Simulated NASDAQ Adjusted closing price Jan.17-Mar.20 2020")
+JanMar2019DiffSim <- arima.sim(n=length(JanMar2019Diff), list(ar=c(alpha1_JanMar2019Diff,alpha2_JanMar2019Diff)), sd = sd_fitJanMar2019Diff)
+plot(JanMar2019DiffSim,  main="Simulated NASDAQ Adjusted closing price Daily Change Jan.17-Mar.20 2019")
+acf(JanMar2019DiffSim,  main="Simulated NASDAQ Adjusted closing price Jan.17-Mar.20 2019")
+pacf(JanMar2019DiffSim,  main="Simulated NASDAQ Adjusted closing price Jan.17-Mar.20 2019")
+OctDecDiffSim <- arima.sim(n=length(OctDecDiff), list(ar=c(alpha1_fitOctDecDiff,alpha2_fitOctDecDiff,alpha3_fitOctDecDiff)),sd = sd_fitOctDecDiff)
+plot(OctDecDiffSim,  main="Simulated NASDAQ Adjusted closing price Daily Change Oct-Dec 2019")
+acf(OctDecDiffSim, main="Simulated NASDAQ Adjusted closing price Daily Change Oct-Dec 2019")
+pacf(OctDecDiffSim, main="Simulated NASDAQ Adjusted closing price Daily Change Oct-Dec 2019")
+```
+
+### Manually-fitted Model Analysis
+  The simulated data behaviours as we expected. The simulated models are not perfectly look like our differenced plots, but it is still gives the information the behaviours are similar. The ACF plots tails off, and PACF plots cuts off at lag p (AR(p)) for all three models. Model diagnoistics and the simulated models using our fitted models tell it matches expectation from First Differences Anaylsis.
+
+## Automatically-Fitted Models
+```{r automodels}
+JanToMarAuto = auto.arima(JanToMar$Adj.Close)
+tsdiag(JanToMarAuto)
+#ARIMA(1,1,0)
+
+JanToMar2019Auto = auto.arima(JanToMar2019$Adj.Close)
+tsdiag(JanToMar2019Auto)
+#ARIMA(0,1,0)
+
+OctToDecAuto = auto.arima(OctToDec$Adj.Close)
+tsdiag(OctToDecAuto)
+#ARIMA(0,1,0)
+```
+
+   Global pandemics are not common variables to include within models, and so, as we are presented with the opportunity to see how an actual pandemic can affect model fitting, we decided to use the auto.arima() function from the package "forecast". The best ARIMA models were automatically fit by the function based on AIC. First looking at both the 2019 series, auto.arima() returns an ARIMA(0,1,0), while an ARIMA(1,1,0) is returned for the January to March 2020 series.
+  
+  As expected, the time series affected by the pandemic deviates from the other two. Intuitively, one would think a model based on a stock market index should exhibit AR(P) coefficients, where P > 0. Thus, by removing stationary effects such as a trend on what we suspect is an AR(1) model, sequential observations in a differenced series should only be dictated by white noise. This is confirmed by the ARIMA(0,1,0) models returned by auto.arima() for both the 2019 series.
+  
+    Since fitted models do not capture reality perfectly and exhaustively, we can see the realization of this limitation in the auto-fit model of the January to March 2020 time series. An ARIMA(1,1,0) model is returned, suggesting that sequential observations are based off the previous one after first differencing. Of course, it is out of our reach to validate pandemic affected models, but nevertheless it is interesting to see how it affects current methods of modelling.
+
+## Forecasting Model
+
+  To see how much the real data for January to March 2020 diverged, we can compare it to the forecasted values of a Holt-Winters model trained on the data for October to December 2019, where the NASDAQ index still seemed to be behaving "normally". While there is a grain of salt to be taken here with such a forecasted model since we're essentially forecasting as many data points as there are in the training set, We think it'll still be an interesting comparison to make.
+  
+```{r HoltWinters}
+hw <- HoltWinters(as.ts(OctToDec$Adj.Close,frequency=7), alpha = NULL, beta = NULL, 
+gamma = FALSE, seasonal = c("additive", "multiplicative"), l.start = NULL, b.start = NULL, s.start = NULL, optim.start = c(alpha = 0.3, beta = 0.1, gamma =0.1), optim.control = list())
+hw
+```
+```{r}
+JanToMar.predict <- predict(hw, n.ahead = 44)
+plot(JanToMar$Adj.Close, ylim=c(7500,10500))
+points(1:44, JanToMar.predict,col="2")
+```
+### Analysis of Forecast
+As we can see, with the dearth of data the Holt-Winters method resulted in a prediction that appears almost linear. However, the predictions for a look-ahead of 44 actually appears to fit the data quite well for the data points leading up to before news and concerns of coronavirus really spread. The data only really diverges from this model starting in the time point corresponding to early Feburary where the markets started reacting.
+
+It's certainly hard to say for sure with how our forecast model was fitted, and how the models don't account for anything other potential shift in trends, the NASDAQ index maybe have continued experiencing a positive trend throughout Febuary and into March.
+
+## Conclusion 
+  In conclusion, our models show that Covid-19 affected the NASDAQ adjusted closing price in a few facets. It greatly increased the day to day volatility of the daily change in the price as evidenced by our analysis of the time series for the first differences. It has also certianly shifted the course of the trend to be a steep negative trend as opposed to the gentle positive trend that the data from the preceeding 3 months would indicate.
+  
+  All in all, our expectations that the growing concerns of the Coronavirus would greatly impact the adjusted closing price of NASDAQ were met fully. Through our analysis, we have come to see how we should not blindly follow models and believe they can predict major events such as this one.
